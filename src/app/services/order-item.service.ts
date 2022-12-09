@@ -1,7 +1,7 @@
 import { HttpClient } from "@angular/common/http";
 import { Injectable } from "@angular/core";
 import { Observable, of } from "rxjs";
-import { combineAll, concatAll, concatMap, every, filter, map, tap, toArray } from "rxjs/operators";
+import { combineAll, concatAll, concatMap, delay, every, filter, map, tap, toArray } from "rxjs/operators";
 import { IOrderItem } from "src/app/models/order-item.model";
 import { OrderService } from 'src/app/services/order.service';
 
@@ -42,15 +42,11 @@ export class OrderItemService {
   }
 
   queryByOrder(orderId: number): Observable<IOrderItem[]> {
-    let obs: Observable<IOrderItem[]>;
-    if (this.cacheOrderItems) {
-      obs = of(this.cacheOrderItems);
-    } else {
-      obs = this.query();
-    }
-    return obs.pipe(
+    return this.query().pipe(
+      delay(1000),
       concatMap(items => items),
-      filter(orderItem => orderItem.order!.id == orderId),
+      filter(orderItem => orderItem.order!.id === orderId),
+      tap(item => console.log(item)),
       toArray(),
     );
   }

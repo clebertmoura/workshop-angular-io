@@ -2,6 +2,16 @@
   <p>My Checkouts</p>
 </h1>
 
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex align-items-center" *ngIf="loading">
+      <strong>Loading...</strong>
+      <div class="spinner-border ml-auto" role="status" aria-hidden="true"></div>
+      <button type="button" class="btn btn-outline-primary" (click)="cancel()" [disabled]="!loading">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <table class="table table-striped">
   <thead>
     <tr>

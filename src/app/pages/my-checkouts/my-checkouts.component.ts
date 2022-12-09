@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { Observable, Subscription } from 'rxjs';
-import { concatMap, map, tap, toArray } from 'rxjs/operators';
+import { Observable, Subject, Subscription } from 'rxjs';
+import { concatMap, filter, finalize, map, tap, toArray } from 'rxjs/operators';
 import { IOrderItem } from 'src/app/models/order-item.model';
-import { IOrder } from 'src/app/models/order.model';
+import { IOrder, OrderStatus } from 'src/app/models/order.model';
 import { OrderItemService } from 'src/app/services/order-item.service';
 import { OrderService } from 'src/app/services/order.service';
 import { ProductService } from 'src/app/services/product.service';
@@ -14,9 +14,11 @@ import { ProductService } from 'src/app/services/product.service';
 })
 export class MyCheckoutsComponent implements OnInit {
 
-  public orders?: IOrder[];
-
-  public ordersCollapseMap: any = {};
+  orders?: IOrder[] = [];
+  ordersCollapseMap: any = {};
+  loading = false;
+  cancelledSubject = new Subject<boolean>();
+  cancelledObs$!: Observable<boolean>;
 
   constructor(
     private orderService: OrderService,
@@ -25,43 +27,60 @@ export class MyCheckoutsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
+    // descomente esse linha para usar o cancelamento de subscrição
+    // this.cancelledObs$ = this.cancelledSubject.pipe(shareReplay());
+
+    this.loading = true;
     this.orderService
       .query()
       .pipe(
-        concatMap(resOrders => (this.orders = resOrders ?? [])),
-        tap(order => {
-          this.ordersCollapseMap[order.id] = { collapsed: true }
-        }),
-        // com o concatMap as requisições ao backend são realizadas de forma sequencial, e emitidas uma a uma
+        // descomente esse linha para usar o cancelamento de subscrição
+        // takeUntil(this.cancelledObs$),
+
+        concatMap(resOrders => resOrders ?? []),
+
+        // o operador take só recebe apenas as 3 primeiras emissões e depois completa.
+        // take(3),
+        filter(order => order.status === OrderStatus.COMPLETED),
         concatMap(order => this.loadOrderItems(order)),
 
-        // com o mergeMap as requisições ao backend são realizadas de forma paralela
+        // use o mergeMap para requisições em paralelo
         // mergeMap(order => this.loadOrderItems(order)),
 
-        // o switchMap cancela a subscrições de requisições anteriores que não tenham sido completadas
-        // switchMap(order => this.loadOrderItems(order)),
-
-        // converte as emissões em um array
-        toArray()
+        tap(order => this.orders?.push(order)),
+        finalize(() => (this.loading = false))
       )
       .subscribe();
   }
 
-  loadOrderItems(order: IOrder): Observable<IOrderItem[]> {
+  loadOrderItems(order: IOrder): Observable<IOrder> {
+    this.ordersCollapseMap[order.id] = { collapsed: true };
     return this.orderItemService.queryByOrder(order.id).pipe(
+      // descomente esse linha para usar o cancelamento de subscrição
+      // takeUntil(this.cancelledObs$),
+
       concatMap(resOrderItems => (order.items = resOrderItems ?? [])),
       concatMap(orderItem => this.loadOrderItemProduct(orderItem)),
+
+      // use o mergeMap para requisições em paralelo
       // mergeMap(orderItem => this.loadOrderItemProduct(orderItem)),
-      // switchMap(orderItem => this.loadOrderItemProduct(orderItem)),
-      toArray()
+
+      map(() => order)
     );
   }
 
   loadOrderItemProduct(orderItem: IOrderItem): Observable<IOrderItem> {
     return this.productService.find(orderItem.product!.id).pipe(
+      // descomente esse linha para usar o cancelamento de subscrição
+      // takeUntil(this.cancelledObs$),
+
       tap(product => (orderItem.product = product ?? orderItem.product)),
       map(() => orderItem)
     );
+  }
+
+  cancel(): void {
+    this.cancelledSubject.next(true);
   }
 
 }
