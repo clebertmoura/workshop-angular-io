@@ -30,7 +30,7 @@
             type="button"
             class="btn btn-outline-primary"
             (click)="collapse.toggle()"
-            [attr.aria-expanded]="!ordersCollapseMap[order.id].collapsed"
+            [attr.aria-expanded]="ordersCollapseMap[order.id]?.collapsed"
             [attr.aria-controls]="'#collapse_order{{order.id}}'"
           >
             See items
