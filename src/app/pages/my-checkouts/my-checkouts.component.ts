@@ -12,54 +12,41 @@ import { ProductService } from 'src/app/services/product.service';
   templateUrl: './my-checkouts.component.html',
   styleUrls: ['./my-checkouts.component.scss']
 })
-export class MyCheckoutsComponent {
-
-  cache$?: Observable<Array<IOrder>>;
-
+export class MyCheckoutsComponent implements OnInit {
+  orders$?: Observable<IOrder[]>;
   ordersCollapseMap: any = {};
-  loading = true;
-  reloadOrders$ = new Subject<void>();
+  loading = false;
+  cancelledSubject = new Subject<boolean>();
+  cancelledObs$!: Observable<boolean>;
+  errorMessage?: string;
 
-  constructor(
-    private orderService: OrderService,
-    private orderItemService: OrderItemService,
-    private productService: ProductService
-  ) { }
+  constructor(private orderService: OrderService, private orderItemService: OrderItemService, private productService: ProductService) {}
 
-  get orders$(): Observable<Array<IOrder>> {
-    if (!this.cache$) {
-      this.cache$ = this.orderService.query().pipe(
-        // descomente as linhas abaixo para recarregar que a subscrição seja notificada de forma compartilhada
-        // takeUntil(this.reloadOrders$),
-        // shareReplay({ bufferSize: 1, refCount: true}),
+  ngOnInit(): void {
+    this.cancelledObs$ = this.cancelledSubject.pipe(shareReplay());
+    this.loading = true;
 
-        concatMap(resOrders => resOrders ?? []),
-        filter(order => order.status === OrderStatus.COMPLETED),
-        toArray(),
-        finalize(() => (this.loading = false))
-      );
-    }
-    return this.cache$;
+    // check: orderService.query() raises an error in first request
+    this.orders$ = this.orderService.query().pipe(
+      takeUntil(this.cancelledObs$),
+      shareReplay(),
+      concatMap(resOrders => resOrders ?? []),
+      filter(order => order.status === OrderStatus.COMPLETED),
+      toArray(),
+
+      // descomente o retry para que tente novamente quando ocorrer um erro
+      // retry(1),
+
+      // descomente o catchError para fazer um tratamento de erro, adicionando uma mensagem de erro
+      // catchError((error) => {
+      //   this.errorMessage = error;
+      //   return [];
+      // }),
+      finalize(() => (this.loading = false))
+    );
   }
 
-  addOrder(): void {
-    const newOrder: IOrder = {
-      id: -1,
-      code: 'asdasdsa',
-      customer: { id: 1 },
-      placedDate: new Date(),
-      status: OrderStatus.COMPLETED,
-    };
-    this.orderService
-      .create(newOrder)
-      .pipe(
-        tap(() => {
-          // descomente as linhas abaixo para recarregar a cache
-          // this.reloadOrders$.next();
-          // this.cache$ = undefined;
-        })
-      )
-      .subscribe();
+  cancel(): void {
+    this.cancelledSubject.next(true);
   }
-
 }

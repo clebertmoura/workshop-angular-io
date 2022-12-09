@@ -11,6 +11,8 @@ export class OrderService {
 
   protected cacheOrders?: IOrder[];
 
+  protected attempt = 1;
+
   constructor(private httpClient: HttpClient) {}
 
   create(order: IOrder): Observable<IOrder> {
@@ -38,6 +40,13 @@ export class OrderService {
     } else {
       return this.httpClient.get<any>(this.apiUrl)
         .pipe(
+          delay(1000),
+          tap(() => {
+            if (this.attempt === 1) {
+              this.attempt++;
+              throw 'Error loading data from API';
+            }
+          }),
           map(data => data.orders),
           tap(orders => this.cacheOrders = orders)
         );
