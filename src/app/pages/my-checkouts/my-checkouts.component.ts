@@ -1,4 +1,7 @@
 import { Component, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
+import { IOrderItem } from 'src/app/models/order-item.model';
 import { IOrder } from 'src/app/models/order.model';
 import { OrderItemService } from 'src/app/services/order-item.service';
 import { OrderService } from 'src/app/services/order.service';
@@ -22,23 +25,43 @@ export class MyCheckoutsComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.orderService.query().subscribe(resOrders => {
-      this.orders = resOrders ?? [];
-      this.orders.forEach(order => {
-        this.ordersCollapseMap[order.id] = { collapsed: true };
-        order.items = order.items ?? [];
-        this.orderItemService.queryByOrder(order.id).subscribe(resOrderItems => {
-          resOrderItems.forEach(orderItem => {
-            this.productService.find(orderItem.product!.id).subscribe(resProduct => {
-              if (resProduct) {
-                orderItem.product = resProduct;
-              }
-            });
-            order.items!.push(orderItem);
+    this.orderService
+      .query()
+      .pipe(
+        map(resOrders => (this.orders = resOrders ?? [])),
+        tap(orders => {
+          orders.forEach(order => {
+            this.loadOrderItems(order);
           });
-        });
+        })
+      )
+      .subscribe(orders => {
+        this.orders = orders;
       });
-    });
+  }
+
+  loadOrderItems(order: IOrder): Subscription {
+    this.ordersCollapseMap[order.id] = { collapsed: true };
+    return this.orderItemService
+      .queryByOrder(order.id)
+      .pipe(
+        map(resOrderItems => (order.items = resOrderItems ?? [])),
+        tap(orderItems => {
+          orderItems.forEach(orderItem => {
+            this.loadOrderItemProduct(orderItem);
+          });
+        })
+      )
+      .subscribe();
+  }
+
+  loadOrderItemProduct(orderItem: IOrderItem): Subscription {
+    return this.productService
+      .find(orderItem.product!.id)
+      .pipe(
+        tap(product => (orderItem.product = product ?? orderItem.product))
+      )
+      .subscribe();
   }
 
 }
