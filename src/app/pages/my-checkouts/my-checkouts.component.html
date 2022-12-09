@@ -1,0 +1,74 @@
+<h1>
+  <p>My Checkouts</p>
+</h1>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Placed Date</th>
+      <th scope="col">Status</th>
+      <th scope="col">Customer</th>
+      <th scope="col">Order Items</th>
+    </tr>
+  </thead>
+  <tbody>
+    <ng-container *ngFor="let order of orders; index as i">
+      <tr>
+        <th scope="row">{{ order.id }}</th>
+        <td>
+          {{ order.placedDate }}
+        </td>
+        <td>
+          {{ order.status }}
+        </td>
+        <td>
+          {{ order.customer!.email }}
+        </td>
+        <td>
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            (click)="collapse.toggle()"
+            [attr.aria-expanded]="!ordersCollapseMap[order.id].collapsed"
+            [attr.aria-controls]="'#collapse_order{{order.id}}'"
+          >
+            See items
+          </button>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="5">
+          <div id="collapse_order{{ order.id }}" #collapse="ngbCollapse" [(ngbCollapse)]="ordersCollapseMap[order.id].collapsed">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Product</th>
+                  <th scope="col">Quantity</th>
+                  <th scope="col">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <ng-container *ngFor="let orderItem of order.items; index as idxItem">
+                  <tr>
+                    <th scope="row">{{ orderItem.id }}</th>
+                    <td>
+                      {{ orderItem.product!.name }}
+                    </td>
+                    <td>
+                      {{ orderItem.quantity }}
+                    </td>
+                    <td>
+                      {{ orderItem.totalPrice }}
+                    </td>
+                  </tr>
+                </ng-container>
+              </tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
+    </ng-container>
+  </tbody>
+</table>
