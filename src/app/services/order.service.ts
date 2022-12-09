@@ -13,6 +13,12 @@ export class OrderService {
 
   constructor(private httpClient: HttpClient) {}
 
+  create(order: IOrder): Observable<IOrder> {
+    order.id = this.cacheOrders?.length ?? 1;
+    this.cacheOrders?.push(order);
+    return of(order);
+  }
+
   find(id: number): Observable<IOrder> {
     let obs: Observable<IOrder[]>;
     if (this.cacheOrders) {

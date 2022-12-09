@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Observable, Subject, Subscription } from 'rxjs';
-import { concatMap, filter, finalize, map, tap, toArray } from 'rxjs/operators';
+import { concatMap, filter, finalize, map, shareReplay, takeUntil, tap, toArray } from 'rxjs/operators';
 import { IOrderItem } from 'src/app/models/order-item.model';
 import { IOrder, OrderStatus } from 'src/app/models/order.model';
 import { OrderItemService } from 'src/app/services/order-item.service';
@@ -12,13 +12,13 @@ import { ProductService } from 'src/app/services/product.service';
   templateUrl: './my-checkouts.component.html',
   styleUrls: ['./my-checkouts.component.scss']
 })
-export class MyCheckoutsComponent implements OnInit {
+export class MyCheckoutsComponent {
 
-  orders?: IOrder[] = [];
+  cache$?: Observable<Array<IOrder>>;
+
   ordersCollapseMap: any = {};
-  loading = false;
-  cancelledSubject = new Subject<boolean>();
-  cancelledObs$!: Observable<boolean>;
+  loading = true;
+  reloadOrders$ = new Subject<void>();
 
   constructor(
     private orderService: OrderService,
@@ -26,61 +26,40 @@ export class MyCheckoutsComponent implements OnInit {
     private productService: ProductService
   ) { }
 
-  ngOnInit(): void {
-    // descomente esse linha para usar o cancelamento de subscrição
-    // this.cancelledObs$ = this.cancelledSubject.pipe(shareReplay());
-
-    this.loading = true;
-    this.orderService
-      .query()
-      .pipe(
-        // descomente esse linha para usar o cancelamento de subscrição
-        // takeUntil(this.cancelledObs$),
+  get orders$(): Observable<Array<IOrder>> {
+    if (!this.cache$) {
+      this.cache$ = this.orderService.query().pipe(
+        // descomente as linhas abaixo para recarregar que a subscrição seja notificada de forma compartilhada
+        // takeUntil(this.reloadOrders$),
+        // shareReplay({ bufferSize: 1, refCount: true}),
 
         concatMap(resOrders => resOrders ?? []),
-
-        // o operador take só recebe apenas as 3 primeiras emissões e depois completa.
-        // take(3),
         filter(order => order.status === OrderStatus.COMPLETED),
-        concatMap(order => this.loadOrderItems(order)),
-
-        // use o mergeMap para requisições em paralelo
-        // mergeMap(order => this.loadOrderItems(order)),
-
-        tap(order => this.orders?.push(order)),
+        toArray(),
         finalize(() => (this.loading = false))
+      );
+    }
+    return this.cache$;
+  }
+
+  addOrder(): void {
+    const newOrder: IOrder = {
+      id: -1,
+      code: 'asdasdsa',
+      customer: { id: 1 },
+      placedDate: new Date(),
+      status: OrderStatus.COMPLETED,
+    };
+    this.orderService
+      .create(newOrder)
+      .pipe(
+        tap(() => {
+          // descomente as linhas abaixo para recarregar a cache
+          // this.reloadOrders$.next();
+          // this.cache$ = undefined;
+        })
       )
       .subscribe();
-  }
-
-  loadOrderItems(order: IOrder): Observable<IOrder> {
-    this.ordersCollapseMap[order.id] = { collapsed: true };
-    return this.orderItemService.queryByOrder(order.id).pipe(
-      // descomente esse linha para usar o cancelamento de subscrição
-      // takeUntil(this.cancelledObs$),
-
-      concatMap(resOrderItems => (order.items = resOrderItems ?? [])),
-      concatMap(orderItem => this.loadOrderItemProduct(orderItem)),
-
-      // use o mergeMap para requisições em paralelo
-      // mergeMap(orderItem => this.loadOrderItemProduct(orderItem)),
-
-      map(() => order)
-    );
-  }
-
-  loadOrderItemProduct(orderItem: IOrderItem): Observable<IOrderItem> {
-    return this.productService.find(orderItem.product!.id).pipe(
-      // descomente esse linha para usar o cancelamento de subscrição
-      // takeUntil(this.cancelledObs$),
-
-      tap(product => (orderItem.product = product ?? orderItem.product)),
-      map(() => orderItem)
-    );
-  }
-
-  cancel(): void {
-    this.cancelledSubject.next(true);
   }
 
 }
